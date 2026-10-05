@@ -89,6 +89,13 @@
   .wide .val{font-size:1.6rem;color:var(--blue-ink)}
   .wide div:last-child{text-align:right}
 
+  .total{
+    background:var(--pink);border-radius:18px;padding:18px 20px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+  }
+  .total .val{color:var(--pink-ink)}
+  .total .sub{text-align:right}
+  .total .sub span{display:block;white-space:nowrap}
   .panel{background:#fff;border:2px solid var(--line);border-radius:20px;padding:20px 18px}
   .panel h2{font-size:.85rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6A6A6A;margin-bottom:14px}
 
@@ -164,6 +171,14 @@
 </div>
 
 <main>
+  <section class="total">
+    <div>
+      <p class="lbl" id="tLbl">Total Expenses</p>
+      <p class="val" id="tVal">—</p>
+    </div>
+    <p class="sub" id="tSub"></p>
+  </section>
+
   <section class="cards">
     <button class="card exp" data-mode="expenses" aria-pressed="true">
       <span class="lbl">Expenses</span>
@@ -221,7 +236,7 @@
 
 <script>
   // ⬇️ Paste your Apps Script web app URL (ends in /exec)
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyL-HLsmRMoK8y5aODalalcag87cGtRbEuaf3QK4eBh1LTiijVnc8PlCfx549AN0qhLSw/exec';
+  const API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
   // Expense dropdown options (order shown in the app)
   const CATEGORIES = [
@@ -361,6 +376,13 @@
     const im = ind.byMonth[selMonth] || { usd: 0, inr: 0, items: [] };
     $('cInd').textContent = usd0(im.usd);
     $('cIndSub').textContent = inr0(im.inr);
+
+    $('tLbl').textContent = 'Total Expenses — ' + MONTHS_FULL[+m - 1];
+    $('tVal').textContent = usd(expMonth);
+    $('tSub').innerHTML = '';
+    ['Year to date', usd0(expYtd)].forEach(t => {
+      const s = document.createElement('span'); s.textContent = t; $('tSub').appendChild(s);
+    });
 
     $('allUsd').textContent = usd0(ind.totalUsd);
     $('allInr').textContent = inr0(ind.totalInr);
