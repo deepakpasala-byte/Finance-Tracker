@@ -306,6 +306,7 @@
   let selMonth = selYear + '-' + pad(new Date().getMonth() + 1);
   let mode = 'expenses';
   let flashCat = null;
+  let currentPin = '';   // kept in memory only; asked again each time the app opens
 
   // ---------- Toast ----------
   let toastTimer;
@@ -324,12 +325,12 @@
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight
-      body: JSON.stringify(Object.assign({}, payload, { pin: store.get('pin') }))
+      body: JSON.stringify(Object.assign({}, payload, { pin: currentPin }))
     });
     if (!res.ok) throw new Error('Server error ' + res.status);
     const data = await res.json();
     if (!data.ok) {
-      if (data.error === 'Wrong PIN') { store.set('pin', ''); showLock(); }
+      if (data.error === 'Wrong PIN') { currentPin = ''; showLock(); }
       throw new Error(data.error || 'Request failed');
     }
     return data;
@@ -551,12 +552,12 @@
   async function tryPin() {
     checking = true;
     document.querySelectorAll('.key').forEach(k => k.disabled = true);
-    store.set('pin', entered);
+    currentPin = entered;
     try {
       accept(await api({ action: 'summary' }));
       $('lock').hidden = true;
     } catch (err) {
-      store.set('pin', '');
+      currentPin = '';
       const d = $('dots');
       d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
       setTimeout(() => showLock(err.message === 'Wrong PIN' ? 'Wrong PIN, try again' : err.message), 400);
@@ -575,6 +576,17 @@
     if (entered.length === PIN_LENGTH) tryPin();
   }
 
+  // Lock again when the app has been in the background for a while
+  const LOCK_AFTER_SECONDS = 0;   // 0 = lock every time you leave the app
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (currentPin && Date.now() - hiddenAt >= LOCK_AFTER_SECONDS * 1000) {
+      currentPin = '';
+      showLock();
+    }
+  });
+
   $('pad').addEventListener('click', e => {
     const b = e.target.closest('[data-k]');
     if (b) press(b.dataset.k);
@@ -588,7 +600,8 @@
   // ---------- Start ----------
   CATEGORIES.forEach(c => $('category').add(new Option(c, c)));
   render();
-  if (store.get('pin')) sync(); else showLock();
+  store.set('pin', '');   // clears a PIN saved by older versions
+  showLock();
 </script>
 </body>
 </html>
