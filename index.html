@@ -70,14 +70,6 @@
   /* ---------- Content ---------- */
   main{max-width:640px;margin:0 auto;padding:16px 16px calc(var(--safe-b) + 40px);display:grid;gap:12px}
 
-  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .card{
-    border:2px solid transparent;border-radius:18px;padding:18px 10px;text-align:center;cursor:pointer;
-    display:grid;gap:4px;
-  }
-  .card[aria-pressed="true"]{border-color:currentColor}
-  .card.exp{background:var(--lav);color:var(--lav-ink)}
-  .card.ind{background:var(--peach);color:var(--peach-ink)}
   .lbl{font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#555}
   .val{font-size:1.85rem;font-weight:900;line-height:1.1}
   .sub{font-size:.92rem;font-weight:600;color:var(--muted)}
@@ -177,19 +169,6 @@
       <p class="val" id="tVal">—</p>
     </div>
     <p class="sub" id="tSub"></p>
-  </section>
-
-  <section class="cards">
-    <button class="card exp" data-mode="expenses" aria-pressed="true">
-      <span class="lbl">Expenses</span>
-      <span class="val" id="cExp">—</span>
-      <span class="sub" id="cExpSub">&nbsp;</span>
-    </button>
-    <button class="card ind" data-mode="india" aria-pressed="false">
-      <span class="lbl">India</span>
-      <span class="val" id="cInd">—</span>
-      <span class="sub" id="cIndSub">&nbsp;</span>
-    </button>
   </section>
 
   <section class="wide">
@@ -366,16 +345,11 @@
 
     if (!exp || !ind) return;
 
-    // Cards
+    // Totals
     const expMonth = exp.totals[selMonth] || 0;
     const expYtd = Object.keys(exp.totals).filter(k => k.startsWith(y + '-') && k <= selMonth)
       .reduce((s, k) => s + exp.totals[k], 0);
-    $('cExp').textContent = usd0(expMonth);
-    $('cExpSub').textContent = 'of ' + usd0(expYtd) + ' YTD';
-
     const im = ind.byMonth[selMonth] || { usd: 0, inr: 0, items: [] };
-    $('cInd').textContent = usd0(im.usd);
-    $('cIndSub').textContent = inr0(im.inr);
 
     $('tLbl').textContent = 'Total Expenses — ' + MONTHS_FULL[+m - 1];
     $('tVal').textContent = usd(expMonth);
@@ -438,11 +412,9 @@
     $('indUsd').hidden = !isInd;
     $('indRate').hidden = !isInd;
     $('indReason').hidden = !isInd;
-    document.querySelectorAll('.card').forEach(c => c.setAttribute('aria-pressed', c.dataset.mode === m));
     updatePreview();
   }
   $('type').addEventListener('change', e => setMode(e.target.value));
-  document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => setMode(c.dataset.mode)));
 
   function updatePreview() {
     if (mode !== 'india') { $('preview').textContent = ''; return; }
