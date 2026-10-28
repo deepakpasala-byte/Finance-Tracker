@@ -273,14 +273,14 @@
 
 <script>
   // ⬇️ Paste your Apps Script web app URL (ends in /exec)
-  const API_URL = 'https://script.google.com/macros/s/AKfycbw0-NIpqw5N1jeZGyTRDhPB-YooIM_LD3-gmokHBt69MeHhV5v-XYd7ILiRfpptHquQJw/exec';
+  const API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
   // Expense dropdown options (order shown in the app)
   const CATEGORIES = [
-    'Bills', 'Car EMI', 'Car Insurance', 'Car Wash', 'Claude/Chatgpt',
+    'Bills', 'Car EMI', 'Car Insurance', 'Car Registration', 'Car Wash', 'Claude/Chatgpt',
     'Utilities', 'Entertainment', 'Fidelity', 'Food', 'Gifts',
     'Indian Groceries', 'Other Groceries', 'Medical', 'Phone Bill',
-    'Rent', 'Restaurant', 'Shopping', 'Trips'
+    'Rent', 'Restaurant', 'Shopping', 'Trips', 'Misc'
   ];
 
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -577,7 +577,7 @@
   }
 
   // Lock again when the app has been in the background for a while
-  const LOCK_AFTER_SECONDS = 0;   // 0 = lock every time you leave the app
+  const LOCK_AFTER_SECONDS = 60;   // 0 = lock every time you leave the app
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { hiddenAt = Date.now(); return; }
