@@ -113,6 +113,12 @@
   }
   .add:disabled{opacity:.6;cursor:default}
   .preview{font-weight:800;color:var(--peach-ink)}
+  .sign{
+    height:52px;padding:0 18px;border-radius:14px;cursor:pointer;
+    background:var(--field);border:2px solid var(--line);color:#6A6A6A;font-weight:800;font-size:1rem;
+  }
+  .sign[aria-pressed="true"]{background:var(--pink);border-color:var(--pink-ink);color:var(--pink-ink)}
+  .add.minus{background:var(--pink-ink)}
 
   .list{list-style:none}
   .list li{display:flex;justify-content:space-between;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);font-weight:700}
@@ -230,6 +236,7 @@
     <input id="indReason" class="reason" maxlength="200" autocomplete="off" placeholder="Reason" aria-label="Reason" hidden>
     <div class="actions">
       <button id="addBtn" class="add" type="submit">Add</button>
+      <button id="signBtn" class="sign" type="button" aria-pressed="false">− Deduct</button>
       <span id="preview" class="preview" aria-live="polite"></span>
     </div>
   </form>
@@ -273,9 +280,9 @@
 
 <script>
   // ⬇️ Paste your Apps Script web app URL (ends in /exec)
-  const API_URL = 'https://script.google.com/macros/s/AKfycbw0-NIpqw5N1jeZGyTRDhPB-YooIM_LD3-gmokHBt69MeHhV5v-XYd7ILiRfpptHquQJw/exec';
+  const API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
-  // Expense dropdown options (order shown in the app)
+  // Shown only until the first sync; after that the list comes from the Categories tab in your sheet
   const CATEGORIES = [
     'Bills', 'Car EMI', 'Car Insurance', 'Car Registration', 'Car Wash', 'Claude/Chatgpt',
     'Utilities', 'Entertainment', 'Fidelity', 'Food', 'Gifts',
@@ -288,10 +295,11 @@
 
   const $ = id => document.getElementById(id);
   const fmt = (n, d) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const usd0 = n => '$' + fmt(n, 0);
-  const usd = n => '$' + fmt(n, 2);
-  const inr = n => '₹' + fmt(n, 2);
-  const inr0 = n => '₹' + fmt(n, 0);
+  const sgn = n => Number(n) < 0 ? '−' : '';
+  const usd0 = n => sgn(n) + '$' + fmt(Math.abs(n || 0), 0);
+  const usd = n => sgn(n) + '$' + fmt(Math.abs(n || 0), 2);
+  const inr = n => sgn(n) + '₹' + fmt(Math.abs(n || 0), 2);
+  const inr0 = n => sgn(n) + '₹' + fmt(Math.abs(n || 0), 0);
   const num = s => parseFloat(String(s || '').replace(/[^0-9.]/g, ''));
   const pad = m => String(m).padStart(2, '0');
 
@@ -398,6 +406,31 @@
   }
 
   // ---------- Main render ----------
+  const NEW_CAT = '__new__';
+  let lastCat = '';
+  function fillCategories(list, pick) {
+    const sel = $('category');
+    const keep = pick || sel.value || lastCat;
+    sel.innerHTML = '';
+    list.forEach(c => sel.add(new Option(c, c)));
+    sel.add(new Option('＋ Add new category…', NEW_CAT));
+    sel.value = list.includes(keep) ? keep : list[0] || '';
+    lastCat = sel.value;
+  }
+  function catList() { return (exp && exp.categories && exp.categories.length) ? exp.categories : CATEGORIES; }
+
+  $('category').addEventListener('change', async e => {
+    if (e.target.value !== NEW_CAT) { lastCat = e.target.value; return; }
+    e.target.value = lastCat;
+    const name = (prompt('New category name') || '').trim();
+    if (!name) return;
+    try {
+      accept(await api({ action: 'addCategory', name }));
+      fillCategories(catList(), name);
+      toast('Added category ' + name);
+    } catch (err) { toast(err.message, true); }
+  });
+
   function render() {
     renderTabs();
     const [y, m] = selMonth.split('-');
@@ -406,6 +439,7 @@
     $('breakTitle').textContent = label;
 
     if (!exp || !ind) return;
+    fillCategories(catList());
 
     // Totals
     const expMonth = exp.totals[selMonth] || 0;
@@ -425,7 +459,8 @@
 
     // Expense breakdown
     const data = exp.byMonth[selMonth] || {};
-    const names = CATEGORIES.concat(Object.keys(data).filter(c => !CATEGORIES.includes(c)));
+    const cats = catList();
+    const names = cats.concat(Object.keys(data).filter(c => !cats.includes(c)));
     const cl = $('catList');
     cl.innerHTML = '';
     names.forEach(name => {
@@ -487,6 +522,18 @@
   $('indRate').addEventListener('input', updatePreview);
   $('indRate').value = store.get('lastRate'); // prefill last rate used
 
+  // ---------- Add / Deduct toggle ----------
+  let deduct = false;
+  function setDeduct(on) {
+    deduct = on;
+    $('signBtn').setAttribute('aria-pressed', on);
+    $('addBtn').textContent = on ? 'Deduct' : 'Add';
+    $('signBtn').textContent = on ? '✕ Cancel' : '− Deduct';
+    $('addBtn').classList.toggle('minus', on);
+    $('expAmount').placeholder = $('indUsd').placeholder = on ? '−$0' : '$0';
+  }
+  $('signBtn').addEventListener('click', () => setDeduct(!deduct));
+
   // ---------- Add entry ----------
   $('entry').addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -497,11 +544,13 @@
       const category = $('category').value;
       const amount = num($('expAmount').value);
       if (!(amount > 0)) { toast('Enter an amount above 0', true); $('expAmount').focus(); return; }
-      payload = { action: 'addExpense', category, amount, month: selMonth };
+      const signed = deduct ? -amount : amount;
+      payload = { action: 'addExpense', category, amount: signed, month: selMonth };
       done = () => {
         flashCat = category;
         $('expAmount').value = '';
-        toast(`Added ${usd(amount)} to ${category} · ${monthName}`);
+        toast(deduct ? `Deducted ${usd(amount)} from ${category} · ${monthName}`
+                     : `Added ${usd(amount)} to ${category} · ${monthName}`);
       };
     } else {
       const amount = num($('indUsd').value);
@@ -509,20 +558,21 @@
       const reason = $('indReason').value.trim();
       if (!(amount > 0)) { toast('Enter the amount in dollars', true); $('indUsd').focus(); return; }
       if (!(rate > 0)) { toast('Enter the USD-INR rate', true); $('indRate').focus(); return; }
-      payload = { action: 'addIndia', usd: amount, rate, reason, month: selMonth };
+      const signed = deduct ? -amount : amount;
+      payload = { action: 'addIndia', usd: signed, rate, reason, month: selMonth };
       done = () => {
         store.set('lastRate', String(rate));
         $('indUsd').value = ''; $('indReason').value = '';
         updatePreview();
-        toast(`Added ${usd(amount)} = ${inr(amount * rate)} · ${monthName}`);
+        toast(`${deduct ? 'Deducted' : 'Added'} ${usd(amount)} = ${inr(amount * rate)} · ${monthName}`);
       };
     }
 
     const btn = $('addBtn');
-    btn.disabled = true; btn.textContent = 'Adding…';
+    btn.disabled = true; btn.textContent = deduct ? 'Deducting…' : 'Adding…';
     try { accept(await api(payload)); done(); render(); }
     catch (err) { toast(err.message, true); }
-    finally { btn.disabled = false; btn.textContent = 'Add'; }
+    finally { btn.disabled = false; setDeduct(false); }
   });
 
   $('syncBtn').addEventListener('click', sync);
@@ -598,7 +648,7 @@
   });
 
   // ---------- Start ----------
-  CATEGORIES.forEach(c => $('category').add(new Option(c, c)));
+  fillCategories(CATEGORIES);
   render();
   store.set('pin', '');   // clears a PIN saved by older versions
   showLock();
