@@ -129,6 +129,14 @@
     font-weight:900;font-size:1.1rem;cursor:pointer;
   }
   .add:disabled{opacity:.6;cursor:default}
+  .add.minus{background:var(--pink-ink)}
+  .actions{display:flex;align-items:center;gap:12px}
+  .sign{
+    height:52px;padding:0 18px;border-radius:14px;cursor:pointer;
+    background:var(--field);border:2px solid var(--line);color:#6A6A6A;font-weight:800;font-size:1rem;
+  }
+  .sign[aria-pressed="true"]{background:var(--pink);border-color:var(--pink-ink);color:var(--pink-ink)}
+  .list li.minus .amt{color:var(--pink-ink)}
 
   .list{list-style:none}
   .list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);font-weight:700}
@@ -276,6 +284,7 @@
     <input id="note" class="note" maxlength="200" autocomplete="off" placeholder="Note (optional)" aria-label="Note">
     <div class="actions">
       <button id="addBtn" class="add" type="submit">Add</button>
+      <button id="signBtn" class="sign" type="button" aria-pressed="false">− Deduct</button>
     </div>
   </form>
 
@@ -556,7 +565,8 @@
       sa.textContent = e.date + (e.note ? ' · ' + e.note : '');
       a.appendChild(sa);
       const r = document.createElement('span'); r.className = 'r';
-      const amt = document.createElement('span'); amt.textContent = money(e.amount);
+      if (e.amount < 0) li.classList.add('minus');
+      const amt = document.createElement('span'); amt.className = 'amt'; amt.textContent = money(e.amount);
       const del = document.createElement('button');
       del.type = 'button'; del.className = 'del'; del.textContent = 'Delete';
       del.dataset.id = e.id;
@@ -595,6 +605,19 @@
     }
   });
 
+  // ---------- Add / Deduct toggle ----------
+  // Deduct saves a negative amount to correct an over-entered expense (iPhone keypad has no minus).
+  let deduct = false;
+  function setDeduct(on) {
+    deduct = on;
+    $('signBtn').setAttribute('aria-pressed', on);
+    $('signBtn').textContent = on ? '✕ Cancel' : '− Deduct';
+    $('addBtn').textContent = on ? 'Deduct' : 'Add';
+    $('addBtn').classList.toggle('minus', on);
+    $('amount').placeholder = on ? '−₹0' : '₹0';
+  }
+  $('signBtn').addEventListener('click', () => setDeduct(!deduct));
+
   // ---------- Add ----------
   $('entry').addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -603,16 +626,19 @@
     const note = $('note').value.trim();
     if (!(amount > 0)) { toast('Enter an amount above 0', true); $('amount').focus(); return; }
     const month = selMonth;
+    const signed = deduct ? -amount : amount;
+    const mName = MONTHS_FULL[+month.slice(5) - 1];
 
     const btn = $('addBtn');
-    btn.disabled = true; btn.textContent = 'Adding…';
+    btn.disabled = true; btn.textContent = deduct ? 'Deducting…' : 'Adding…';
     try {
       flashCat = category;
-      accept(await api({ action: 'addExpense', category, amount, note, month }));
+      accept(await api({ action: 'addExpense', category, amount: signed, note, month }));
       $('amount').value = ''; $('note').value = '';
-      toast(`Added ${money(amount)} to ${category} · ${MONTHS_FULL[+month.slice(5) - 1]}`);
+      toast(deduct ? `Deducted ${money(amount)} from ${category} · ${mName}`
+                   : `Added ${money(amount)} to ${category} · ${mName}`);
     } catch (err) { flashCat = null; toast(err.message, true); }
-    finally { btn.disabled = false; btn.textContent = 'Add'; }
+    finally { btn.disabled = false; setDeduct(false); }
   });
 
   $('syncBtn').addEventListener('click', sync);
