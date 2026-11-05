@@ -94,6 +94,19 @@
   .cancel{background:rgba(255,255,255,.65);color:#555}
   .save:disabled{opacity:.6}
 
+  /* Two rows: Salary | Savings on top, Expenses full width below */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cards .expenses{grid-column:1 / -1}
+  .half{padding:18px 16px}
+  .half .view{flex-direction:column;align-items:flex-start;height:100%}
+  .half .val{font-size:clamp(1.45rem,7vw,2.1rem)}
+  .half .edit-btn{height:38px;padding:0 16px;margin-top:auto}
+  .half .view > div{margin-bottom:12px}
+  .half .lbl{letter-spacing:.1em}
+  .half .edit-row{grid-template-columns:1fr 1fr}
+  .half .edit-row input{grid-column:1 / -1}
+  .half .save,.half .cancel{height:46px;padding:0 8px}
+
   .panel{background:#fff;border:2px solid var(--line);border-radius:20px;padding:20px 18px}
   .panel h2{font-size:.85rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6A6A6A;margin-bottom:14px}
 
@@ -202,8 +215,9 @@
 </div>
 
 <main>
+  <div class="cards">
   <!-- Label 1: Salary -->
-  <section class="card salary">
+  <section class="card salary half">
     <div class="view">
       <div>
         <p class="lbl">Salary</p>
@@ -222,19 +236,8 @@
     </form>
   </section>
 
-  <!-- Label 2: Expenses -->
-  <section class="card expenses">
-    <div class="view">
-      <div>
-        <p class="lbl" id="expLbl">Expenses</p>
-        <p class="val" id="expVal">—</p>
-        <p class="sub" id="expSub"></p>
-      </div>
-    </div>
-  </section>
-
   <!-- Label 3: Savings -->
-  <section class="card savings">
+  <section class="card savings half">
     <div class="view">
       <div>
         <p class="lbl">Savings</p>
@@ -252,6 +255,18 @@
       </div>
     </form>
   </section>
+
+  <!-- Label 2: Expenses -->
+  <section class="card expenses">
+    <div class="view">
+      <div>
+        <p class="lbl" id="expLbl">Expenses</p>
+        <p class="val" id="expVal">—</p>
+        <p class="sub" id="expSub"></p>
+      </div>
+    </div>
+  </section>
+  </div>
 
   <form id="entry" class="panel" novalidate>
     <h2 id="entryTitle">Add expense</h2>
