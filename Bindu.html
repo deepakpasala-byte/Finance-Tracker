@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Ammulu's Finance">
+<meta name="apple-mobile-web-app-title" content="Bindu's Finance">
 <meta name="theme-color" content="#1E1E1E">
-<title>Ammulu's Finance Tracker</title>
+<title>Bindu's Finance Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -106,6 +106,8 @@
   .half .edit-row{grid-template-columns:1fr 1fr}
   .half .edit-row input{grid-column:1 / -1}
   .half .save,.half .cancel{height:46px;padding:0 8px}
+  .stotal{color:var(--lav-ink);font-weight:800;margin-top:8px}
+  .stotal b{display:block;font-size:1.15rem;font-weight:900}
 
   .panel{background:#fff;border:2px solid var(--line);border-radius:20px;padding:20px 18px}
   .panel h2{font-size:.85rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6A6A6A;margin-bottom:14px}
@@ -210,7 +212,7 @@
 <div class="top">
   <header class="head">
     <div>
-      <h1>Ammulu's Finance Tracker</h1>
+      <h1>Bindu's Finance Tracker</h1>
       <p id="status" class="status">Loading…</p>
     </div>
     <button id="syncBtn" class="sync" aria-label="Sync">
@@ -251,6 +253,7 @@
         <p class="lbl">Savings</p>
         <p class="val" id="savingsVal">—</p>
         <p class="sub" id="savingsSub"></p>
+        <p class="sub stotal" id="savingsTotal"></p>
       </div>
       <button class="edit-btn" type="button" data-edit="savings">Edit</button>
     </div>
@@ -301,7 +304,7 @@
 
 <div id="lock" class="lock" hidden>
   <div class="lock-box">
-    <h2>Ammulu's Finance</h2>
+    <h2>Bindu's Finance</h2>
     <p class="hint">Enter your PIN to continue</p>
     <div id="dots" class="dots" aria-hidden="true"></div>
     <p id="pinMsg" class="pin-msg" role="alert"></p>
@@ -333,6 +336,7 @@
   const PIN_LENGTH = 4;            // must match the number of digits in PIN in Code.gs
   const LOCK_AFTER_SECONDS = 60;   // 0 = lock every time she leaves the app
   const CURRENCY = '₹';
+  const SAVINGS_START = '2026-11';  // first month counted in "Total saved" (yyyy-MM)
 
   // Shown only until the first sync
   const FALLBACK_CATEGORIES = [
@@ -527,6 +531,21 @@
     $('salarySub').textContent = sal.from ? 'Set in ' + monthLabel(sal.from) : 'Default';
     $('savingsVal').textContent = money(sav.amount);
     $('savingsSub').textContent = sav.from ? 'Set in ' + monthLabel(sav.from) : 'Default';
+
+    // Total saved = each month's savings added up, from SAVINGS_START to the selected month
+    const st = $('savingsTotal');
+    st.innerHTML = '';
+    if (selMonth >= SAVINGS_START) {
+      let total = 0, y = +SAVINGS_START.slice(0, 4), m = +SAVINGS_START.slice(5);
+      for (let key = SAVINGS_START; key <= selMonth; ) {
+        total += resolve('savings', key).amount;
+        m++; if (m > 12) { m = 1; y++; }
+        key = y + '-' + pad(m);
+      }
+      st.append('Total saved');
+      const b = document.createElement('b'); b.textContent = money(total);
+      st.appendChild(b);
+    }
     $('expVal').textContent = money(spent);
 
     // Breakdown by category
