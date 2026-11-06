@@ -106,10 +106,16 @@
   .half .edit-row{grid-template-columns:1fr 1fr}
   .half .edit-row input{grid-column:1 / -1}
   .half .save,.half .cancel{height:46px;padding:0 8px}
-  .stotal{color:var(--lav-ink);font-weight:800;margin-top:8px}
-  .stotal b{display:block;font-size:1.15rem;font-weight:900}
-  .stotal .tgt{display:block;color:var(--muted);font-weight:600;margin-top:6px}
-  .stotal .gap{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:8px;font-size:.85rem;font-weight:800;background:rgba(255,255,255,.65)}
+  .cards .goal{grid-column:1 / -1}
+  .goal{background:var(--peach)}  .goal .val{color:var(--peach-ink)}
+  .goal-r{text-align:right}
+  .tval{font-size:1.4rem;font-weight:900;color:#6A5A4A;margin-top:4px}
+  .gap{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:9px;font-size:.88rem;font-weight:800;background:rgba(255,255,255,.7)}
+  .check{
+    display:flex;align-items:center;gap:8px;margin:0 0 12px;cursor:pointer;
+    font-size:.88rem;font-weight:800;color:var(--lav-ink);
+  }
+  .check input{width:22px;height:22px;accent-color:var(--purple);flex:0 0 auto}
   .gap.short{color:var(--pink-ink)} .gap.ahead{color:var(--mint-ink)} .gap.even{color:var(--lav-ink)}
 
   .panel{background:#fff;border:2px solid var(--line);border-radius:20px;padding:20px 18px}
@@ -256,8 +262,8 @@
         <p class="lbl">Savings</p>
         <p class="val" id="savingsVal">—</p>
         <p class="sub" id="savingsSub"></p>
-        <p class="sub stotal" id="savingsTotal"></p>
       </div>
+      <label class="check" id="savedWrap"><input type="checkbox" id="savedBox"> Saved this month</label>
       <button class="edit-btn" type="button" data-edit="savings">Edit</button>
     </div>
     <form class="editor" data-kind="savings" novalidate hidden>
@@ -276,6 +282,22 @@
       <div>
         <p class="lbl" id="expLbl">Expenses</p>
         <p class="val" id="expVal">—</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Label 4: Total saved vs Target -->
+  <section class="card goal" id="goalCard">
+    <div class="view">
+      <div>
+        <p class="lbl" id="goalLbl">Total saved</p>
+        <p class="val" id="goalVal">—</p>
+        <p class="sub" id="goalSub"></p>
+      </div>
+      <div class="goal-r">
+        <p class="lbl">Target</p>
+        <p class="tval" id="goalTarget">—</p>
+        <span class="gap" id="goalGap"></span>
       </div>
     </div>
   </section>
@@ -464,6 +486,19 @@
     });
   });
 
+  // ---------- "Saved this month" checkbox ----------
+  $('savedBox').addEventListener('change', async ev => {
+    const box = ev.target;
+    if (!data) { box.checked = !box.checked; return; }
+    const on = box.checked, month = selMonth;
+    box.disabled = true;
+    try {
+      accept(await api({ action: 'setAmount', kind: 'saved', month, amount: on ? 1 : 0 }));
+      toast(on ? `Marked ${monthLabel(month)} as saved` : `Unmarked ${monthLabel(month)}`);
+    } catch (err) { box.checked = !on; toast(err.message, true); }
+    finally { box.disabled = false; }
+  });
+
   // ---------- Tabs ----------
   function yearList() {
     const now = new Date().getFullYear();
@@ -535,30 +570,33 @@
     $('savingsVal').textContent = money(sav.amount);
     $('savingsSub').textContent = sav.from ? 'Set in ' + monthLabel(sav.from) : 'Default';
 
-    // Total saved = each month's savings added up, from SAVINGS_START to the selected month
-    const st = $('savingsTotal');
-    st.innerHTML = '';
+    // "Saved this month" checkbox (only for months from SAVINGS_START on)
+    const ticked = m => (data.overrides.saved || []).some(o => o.month === m && o.amount > 0);
+    $('savedWrap').hidden = selMonth < SAVINGS_START;
+    $('savedBox').checked = ticked(selMonth);
+
+    // Total saved = savings of every TICKED month from SAVINGS_START to the selected month.
+    // Target = the default savings (Code.gs DEFAULT_SAVINGS) for every one of those months.
+    let total = 0, months = 0;
     if (selMonth >= SAVINGS_START) {
-      let total = 0, months = 0, y = +SAVINGS_START.slice(0, 4), m = +SAVINGS_START.slice(5);
+      let y = +SAVINGS_START.slice(0, 4), m = +SAVINGS_START.slice(5);
       for (let key = SAVINGS_START; key <= selMonth; ) {
-        total += resolve('savings', key).amount;
+        if (ticked(key)) total += resolve('savings', key).amount;
         months++;
         m++; if (m > 12) { m = 1; y++; }
         key = y + '-' + pad(m);
       }
-      // Target = the default savings (Code.gs DEFAULT_SAVINGS) for every one of those months
-      const target = data.defaults.savings * months;
-      const diff = total - target;
-      st.append('Total saved');
-      const b = document.createElement('b'); b.textContent = money(total);
-      st.appendChild(b);
-      const t = document.createElement('span'); t.className = 'tgt';
-      t.textContent = 'Target ' + money(target);
-      const g = document.createElement('span');
-      g.className = 'gap ' + (diff < 0 ? 'short' : diff > 0 ? 'ahead' : 'even');
-      g.textContent = diff < 0 ? money(-diff) + ' short' : diff > 0 ? money(diff) + ' ahead' : 'On target';
-      st.append(t, g);
     }
+    const target = data.defaults.savings * months;
+    const diff = total - target;
+    $('goalLbl').textContent = 'Total saved';
+    $('goalVal').textContent = money(total);
+    $('goalSub').textContent = months ? 'Since ' + monthLabel(SAVINGS_START) : 'Starts ' + monthLabel(SAVINGS_START);
+    $('goalTarget').textContent = money(target);
+    const gap = $('goalGap');
+    gap.hidden = !months;
+    gap.className = 'gap ' + (diff < 0 ? 'short' : diff > 0 ? 'ahead' : 'even');
+    gap.textContent = diff < 0 ? money(-diff) + ' short' : diff > 0 ? money(diff) + ' ahead' : 'On target';
     $('expVal').textContent = money(spent);
 
     // Breakdown by category
