@@ -96,7 +96,10 @@
 
   /* Two rows: Salary | Savings on top, Expenses full width below */
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .cards .expenses{grid-column:1 / -1}
+  .chit{background:#D8E7F0}  .chit .val{color:#3E6A8A}
+  .chit-row{display:grid;gap:8px;width:100%;margin-top:auto}
+  .chit-row input{background:#fff;border-color:rgba(0,0,0,.08);height:46px}
+  .chit-row .save{height:46px;background:#3E6A8A}
   .half{padding:18px 16px}
   .half .view{flex-direction:column;align-items:flex-start;height:100%}
   .half .val{font-size:clamp(1.45rem,7vw,2.1rem)}
@@ -277,13 +280,28 @@
   </section>
 
   <!-- Label 2: Expenses -->
-  <section class="card expenses">
+  <section class="card expenses half">
     <div class="view">
       <div>
         <p class="lbl" id="expLbl">Expenses</p>
         <p class="val" id="expVal">—</p>
       </div>
     </div>
+  </section>
+
+  <!-- Label 5: Chit Fund -->
+  <section class="card chit half">
+    <form id="chitForm" class="view" novalidate>
+      <div>
+        <p class="lbl">Chit Fund</p>
+        <p class="val" id="chitVal">—</p>
+        <p class="sub" id="chitSub"></p>
+      </div>
+      <div class="chit-row">
+        <input id="chitInput" inputmode="decimal" autocomplete="off" placeholder="₹ amount" aria-label="Chit Fund amount">
+        <button id="chitSave" class="save" type="submit">Save</button>
+      </div>
+    </form>
   </section>
 
   <!-- Label 4: Total saved vs Target -->
@@ -486,6 +504,22 @@
     });
   });
 
+  // ---------- Chit Fund (carries forward like Salary) ----------
+  $('chitForm').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (!data) return;
+    const raw = $('chitInput').value, amount = num(raw);
+    if (!String(raw).trim() || !(amount >= 0)) { toast('Enter the Chit Fund amount', true); $('chitInput').focus(); return; }
+    const btn = $('chitSave'), month = selMonth;
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      accept(await api({ action: 'setAmount', kind: 'chit', month, amount }));
+      $('chitInput').value = '';
+      toast(`Chit Fund set to ${money(amount)} from ${monthLabel(month)} onward`);
+    } catch (err) { toast(err.message, true); }
+    finally { btn.disabled = false; btn.textContent = 'Save'; }
+  });
+
   // ---------- "Saved this month" checkbox ----------
   $('savedBox').addEventListener('change', async ev => {
     const box = ev.target;
@@ -598,6 +632,10 @@
     gap.className = 'gap ' + (diff < 0 ? 'short' : diff > 0 ? 'ahead' : 'even');
     gap.textContent = diff < 0 ? money(-diff) + ' short' : diff > 0 ? money(diff) + ' ahead' : 'On target';
     $('expVal').textContent = money(spent);
+
+    const chit = resolve('chit', selMonth);
+    $('chitVal').textContent = money(chit.amount);
+    $('chitSub').textContent = chit.from ? 'Set in ' + monthLabel(chit.from) : 'Not set yet';
 
     // Breakdown by category
     const byCat = {};
