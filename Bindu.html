@@ -108,6 +108,9 @@
   .half .save,.half .cancel{height:46px;padding:0 8px}
   .stotal{color:var(--lav-ink);font-weight:800;margin-top:8px}
   .stotal b{display:block;font-size:1.15rem;font-weight:900}
+  .stotal .tgt{display:block;color:var(--muted);font-weight:600;margin-top:6px}
+  .stotal .gap{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:8px;font-size:.85rem;font-weight:800;background:rgba(255,255,255,.65)}
+  .gap.short{color:var(--pink-ink)} .gap.ahead{color:var(--mint-ink)} .gap.even{color:var(--lav-ink)}
 
   .panel{background:#fff;border:2px solid var(--line);border-radius:20px;padding:20px 18px}
   .panel h2{font-size:.85rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6A6A6A;margin-bottom:14px}
@@ -536,15 +539,25 @@
     const st = $('savingsTotal');
     st.innerHTML = '';
     if (selMonth >= SAVINGS_START) {
-      let total = 0, y = +SAVINGS_START.slice(0, 4), m = +SAVINGS_START.slice(5);
+      let total = 0, months = 0, y = +SAVINGS_START.slice(0, 4), m = +SAVINGS_START.slice(5);
       for (let key = SAVINGS_START; key <= selMonth; ) {
         total += resolve('savings', key).amount;
+        months++;
         m++; if (m > 12) { m = 1; y++; }
         key = y + '-' + pad(m);
       }
+      // Target = the default savings (Code.gs DEFAULT_SAVINGS) for every one of those months
+      const target = data.defaults.savings * months;
+      const diff = total - target;
       st.append('Total saved');
       const b = document.createElement('b'); b.textContent = money(total);
       st.appendChild(b);
+      const t = document.createElement('span'); t.className = 'tgt';
+      t.textContent = 'Target ' + money(target);
+      const g = document.createElement('span');
+      g.className = 'gap ' + (diff < 0 ? 'short' : diff > 0 ? 'ahead' : 'even');
+      g.textContent = diff < 0 ? money(-diff) + ' short' : diff > 0 ? money(diff) + ' ahead' : 'On target';
+      st.append(t, g);
     }
     $('expVal').textContent = money(spent);
 
