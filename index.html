@@ -128,6 +128,19 @@
   @keyframes flash{from{background:var(--lav)}to{background:transparent}}
   .list small{display:block;color:var(--muted);font-weight:500;font-size:.85rem;margin-top:2px}
   .list .r{text-align:right;white-space:nowrap}
+  .list li.up{background:#FBD9D9;border-radius:10px;padding-left:10px;padding-right:10px;border-bottom-color:transparent;margin-bottom:3px}
+  .list li.down{background:#D6EFD0;border-radius:10px;padding-left:10px;padding-right:10px;border-bottom-color:transparent;margin-bottom:3px}
+  .list li.up.zero,.list li.down.zero{color:var(--ink);font-weight:700}
+  .list li.up small{color:#A3312B;font-weight:700}
+  .list li.down small{color:#2F6B2A;font-weight:700}
+  .compare{background:#fff;border:2px solid var(--line);border-radius:20px;padding:18px}
+  .compare h2{font-size:.85rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6A6A6A;margin-bottom:12px}
+  .cmp-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 12px;border-radius:12px;font-weight:700;margin-bottom:6px}
+  .cmp-row.up{background:#FBD9D9;color:#A3312B}
+  .cmp-row.down{background:#D6EFD0;color:#2F6B2A}
+  .cmp-row.net{background:var(--field);color:var(--ink)}
+  .cmp-row span:last-child{white-space:nowrap}
+  .compare .empty{padding:0}
   .empty{color:var(--muted);font-weight:500;padding:4px 2px}
   .split{margin-top:22px}
 
@@ -248,6 +261,11 @@
       <h2>Sent to India</h2>
       <ul id="indList" class="list"></ul>
     </div>
+  </section>
+
+  <section class="compare" aria-live="polite">
+    <h2 id="cmpTitle">Compared with last month</h2>
+    <div id="cmpBody"></div>
   </section>
 </main>
 
@@ -457,23 +475,62 @@
     $('allUsd').textContent = usd0(ind.totalUsd);
     $('allInr').textContent = inr0(ind.totalInr);
 
-    // Expense breakdown
+    // Expense breakdown, compared with the previous month
     const data = exp.byMonth[selMonth] || {};
+    const pm = +m === 1 ? 12 : +m - 1;
+    const prevKey = (+m === 1 ? +y - 1 : +y) + '-' + pad(pm);
+    const prevName = MONTHS_FULL[pm - 1];
+    const prev = exp.byMonth[prevKey] || {};
+    const hasPrev = Object.keys(prev).length > 0;
+
     const cats = catList();
-    const names = cats.concat(Object.keys(data).filter(c => !cats.includes(c)));
+    const names = cats.concat(
+      Object.keys(data).filter(c => !cats.includes(c)),
+      Object.keys(prev).filter(c => !cats.includes(c) && !(c in data))
+    );
+    let upN = 0, upAmt = 0, downN = 0, downAmt = 0;
     const cl = $('catList');
     cl.innerHTML = '';
     names.forEach(name => {
       const amt = data[name] || 0;
+      const before = prev[name] || 0;
+      const diff = Math.round((amt - before) * 100) / 100;
       const li = document.createElement('li');
       if (!amt) li.classList.add('zero');
       if (name === flashCat) li.classList.add('flash');
       const a = document.createElement('span'); a.textContent = name;
       const b = document.createElement('span'); b.className = 'r'; b.textContent = usd(amt);
+      if (hasPrev && diff !== 0) {
+        const s = document.createElement('small');
+        if (diff > 0) { li.classList.add('up'); upN++; upAmt += diff; s.textContent = '▲ ' + usd(diff) + ' vs ' + MONTHS[pm - 1]; }
+        else { li.classList.add('down'); downN++; downAmt += -diff; s.textContent = '▼ ' + usd(-diff) + ' vs ' + MONTHS[pm - 1]; }
+        b.appendChild(s);
+      }
       li.append(a, b);
       cl.appendChild(li);
     });
     flashCat = null;
+
+    // Summary note at the bottom
+    $('cmpTitle').textContent = 'Compared with ' + prevName;
+    const cb = $('cmpBody');
+    cb.innerHTML = '';
+    const line = (cls, left, right) => {
+      const d = document.createElement('div'); d.className = 'cmp-row ' + cls;
+      const l = document.createElement('span'); l.textContent = left;
+      const r = document.createElement('span'); r.textContent = right;
+      d.append(l, r); cb.appendChild(d);
+    };
+    if (!hasPrev) {
+      const p = document.createElement('p'); p.className = 'empty';
+      p.textContent = 'No expenses logged in ' + prevName + ', so there is nothing to compare yet.';
+      cb.appendChild(p);
+    } else {
+      const net = (exp.totals[selMonth] || 0) - (exp.totals[prevKey] || 0);
+      line('up', '▲ ' + upN + ' categor' + (upN === 1 ? 'y' : 'ies') + ' increased', '+' + usd(upAmt));
+      line('down', '▼ ' + downN + ' categor' + (downN === 1 ? 'y' : 'ies') + ' decreased', '−' + usd(downAmt));
+      line('net', 'Overall vs ' + prevName, (net > 0 ? '+' : '') + usd(net));
+    }
 
     // India transfers this month
     const il = $('indList');
