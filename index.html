@@ -142,6 +142,23 @@
   .cmp-row span:last-child{white-space:nowrap}
   .compare .empty{padding:0}
   .empty{color:var(--muted);font-weight:500;padding:4px 2px}
+
+  /* Month view vs Year view */
+  body.yv .mview{display:none}
+  body:not(.yv) .yview{display:none}
+  .months button.yr{color:var(--mint)}
+  .months button.yr[aria-pressed="true"]{color:#fff}
+
+  /* Last added */
+  .recent li .neg{color:var(--pink-ink)}
+
+  /* Year view */
+  .yr-ind{background:var(--peach);border-radius:18px;padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+  .yr-ind .val{font-size:1.6rem;color:var(--peach-ink)}
+  .yr-ind div:last-child{text-align:right}
+  .cat-name{flex:1;min-width:0}
+  .bar{display:block;height:6px;border-radius:3px;background:var(--line);margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--purple);border-radius:3px}
   .split{margin-top:22px}
 
   button:focus-visible{outline:3px solid var(--purple);outline-offset:2px}
@@ -215,7 +232,7 @@
 </div>
 
 <main>
-  <section class="total">
+  <section class="total mview">
     <div>
       <p class="lbl" id="tLbl">Total Expenses</p>
       <p class="val" id="tVal">—</p>
@@ -223,7 +240,7 @@
     <p class="sub" id="tSub"></p>
   </section>
 
-  <section class="wide">
+  <section class="wide mview">
     <div>
       <p class="lbl">India all-time</p>
       <p class="val" id="allUsd">—</p>
@@ -234,7 +251,7 @@
     </div>
   </section>
 
-  <form id="entry" class="panel" novalidate>
+  <form id="entry" class="panel mview" novalidate>
     <h2 id="entryTitle">Add entry</h2>
     <div class="row">
       <select id="category" aria-label="Category"></select>
@@ -254,7 +271,7 @@
     </div>
   </form>
 
-  <section class="panel">
+  <section class="panel mview">
     <h2 id="breakTitle">Breakdown</h2>
     <ul id="catList" class="list"></ul>
     <div class="split">
@@ -263,9 +280,44 @@
     </div>
   </section>
 
-  <section class="compare" aria-live="polite">
+  <section class="compare mview" aria-live="polite">
     <h2 id="cmpTitle">Compared with last month</h2>
     <div id="cmpBody"></div>
+  </section>
+
+  <section class="panel mview">
+    <h2 id="recentTitle">Last added</h2>
+    <ul id="recentList" class="list recent"></ul>
+  </section>
+
+  <!-- Year summary (the YEAR tab after DEC) -->
+  <section class="total yview">
+    <div>
+      <p class="lbl" id="yTotLbl">Total Expenses</p>
+      <p class="val" id="yTot">—</p>
+    </div>
+    <p class="sub" id="yAvg"></p>
+  </section>
+
+  <section class="yr-ind yview">
+    <div>
+      <p class="lbl" id="yIndLbl">Sent to India</p>
+      <p class="val" id="yIndUsd">—</p>
+    </div>
+    <div>
+      <p class="lbl" id="yIndCount">In rupees</p>
+      <p class="val" id="yIndInr">—</p>
+    </div>
+  </section>
+
+  <section class="panel yview">
+    <h2 id="yCatTitle">Expenses by category</h2>
+    <ul id="yCatList" class="list"></ul>
+  </section>
+
+  <section class="panel yview">
+    <h2 id="yMonTitle">Month by month</h2>
+    <ul id="yMonList" class="list"></ul>
   </section>
 </main>
 
@@ -332,6 +384,7 @@
   let selMonth = selYear + '-' + pad(new Date().getMonth() + 1);
   let mode = 'expenses';
   let flashCat = null;
+  let yearView = false;   // true when the YEAR tab is selected
   let currentPin = '';   // kept in memory only; asked again each time the app opens
 
   // ---------- Toast ----------
@@ -413,10 +466,16 @@
       const key = selYear + '-' + pad(i + 1);
       const b = document.createElement('button');
       b.textContent = name;
-      b.setAttribute('aria-pressed', key === selMonth);
-      b.onclick = () => { selMonth = key; render(); };
+      b.setAttribute('aria-pressed', !yearView && key === selMonth);
+      b.onclick = () => { selMonth = key; yearView = false; render(); };
       mb.appendChild(b);
     });
+    const yb2 = document.createElement('button');
+    yb2.textContent = 'Year';
+    yb2.className = 'yr';
+    yb2.setAttribute('aria-pressed', yearView);
+    yb2.onclick = () => { yearView = true; render(); window.scrollTo(0, 0); };
+    mb.appendChild(yb2);
     requestAnimationFrame(() => {
       const on = mb.querySelector('[aria-pressed="true"]');
       if (on) mb.scrollLeft = on.offsetLeft - mb.clientWidth / 2 + on.offsetWidth / 2;
@@ -451,6 +510,8 @@
 
   function render() {
     renderTabs();
+    document.body.classList.toggle('yv', yearView);
+    if (yearView) { renderYear(selYear); return; }
     const [y, m] = selMonth.split('-');
     const label = MONTHS_FULL[+m - 1] + ' ' + y;
     $('entryTitle').textContent = 'Add entry — ' + label;
@@ -553,6 +614,97 @@
       b.appendChild(sb);
       li.append(a, b);
       il.appendChild(li);
+    });
+
+    // Last 2 entries added in this month
+    $('recentTitle').textContent = 'Last added — ' + label;
+    const rl = $('recentList');
+    rl.innerHTML = '';
+    const rec = exp.recent ? (exp.recent[selMonth] || []) : null;
+    if (!rec || !rec.length) {
+      const p = document.createElement('li'); p.className = 'empty';
+      p.textContent = rec ? 'Nothing added in ' + MONTHS_FULL[+m - 1] + ' yet.'
+                          : 'Update Code.gs to see your latest entries here.';
+      rl.appendChild(p);
+    }
+    (rec || []).forEach(it => {
+      const li = document.createElement('li');
+      const a = document.createElement('span'); a.textContent = it.category;
+      const sa = document.createElement('small'); sa.textContent = it.date + (it.amount < 0 ? ' · deduction' : '');
+      a.appendChild(sa);
+      const b = document.createElement('span'); b.className = 'r' + (it.amount < 0 ? ' neg' : '');
+      b.textContent = usd(it.amount);
+      li.append(a, b);
+      rl.appendChild(li);
+    });
+  }
+
+  // ---------- Year summary ----------
+  function renderYear(y) {
+    if (!exp || !ind) return;
+    const keys = Object.keys(exp.totals).filter(k => k.startsWith(y + '-'));
+    const total = keys.reduce((s, k) => s + exp.totals[k], 0);
+    const active = keys.filter(k => exp.totals[k]).length;
+
+    $('yTotLbl').textContent = 'Total Expenses — ' + y;
+    $('yTot').textContent = usd(total);
+    $('yAvg').innerHTML = '';
+    (active ? ['Monthly average', usd0(total / active), active + ' month' + (active === 1 ? '' : 's') + ' logged']
+            : ['No expenses logged']).forEach(t => {
+      const s = document.createElement('span'); s.textContent = t; $('yAvg').appendChild(s);
+    });
+
+    // India for this year
+    const ik = Object.keys(ind.byMonth).filter(k => k.startsWith(y + '-'));
+    const iUsd = ik.reduce((s, k) => s + ind.byMonth[k].usd, 0);
+    const iInr = ik.reduce((s, k) => s + ind.byMonth[k].inr, 0);
+    const iCount = ik.reduce((s, k) => s + ind.byMonth[k].items.length, 0);
+    $('yIndLbl').textContent = 'Sent to India — ' + y;
+    $('yIndUsd').textContent = usd0(iUsd);
+    $('yIndCount').textContent = iCount + ' transfer' + (iCount === 1 ? '' : 's');
+    $('yIndInr').textContent = inr0(iInr);
+
+    // Expenses by category, largest first
+    const byCat = {};
+    keys.forEach(k => Object.entries(exp.byMonth[k] || {}).forEach(([c, v]) => { byCat[c] = (byCat[c] || 0) + v; }));
+    const rows = Object.entries(byCat).filter(([, v]) => Math.round(v * 100)).sort((a, b) => b[1] - a[1]);
+    $('yCatTitle').textContent = 'Expenses by category — ' + y;
+    const cl = $('yCatList');
+    cl.innerHTML = '';
+    if (!rows.length) {
+      const p = document.createElement('li'); p.className = 'empty';
+      p.textContent = 'Nothing logged in ' + y + ' yet.';
+      cl.appendChild(p);
+    }
+    const max = rows.length ? Math.max(...rows.map(r => Math.abs(r[1]))) : 1;
+    rows.forEach(([c, v]) => {
+      const li = document.createElement('li');
+      const a = document.createElement('span'); a.className = 'cat-name'; a.textContent = c;
+      const bar = document.createElement('span'); bar.className = 'bar';
+      const fill = document.createElement('i'); fill.style.width = Math.max(2, Math.abs(v) / max * 100) + '%';
+      bar.appendChild(fill); a.appendChild(bar);
+      const b = document.createElement('span'); b.className = 'r'; b.textContent = usd(v);
+      const s = document.createElement('small'); s.textContent = (total ? Math.round(v / total * 100) : 0) + '% of total';
+      b.appendChild(s);
+      li.append(a, b);
+      cl.appendChild(li);
+    });
+
+    // Month by month
+    $('yMonTitle').textContent = 'Month by month — ' + y;
+    const ml = $('yMonList');
+    ml.innerHTML = '';
+    const cur = exp.currentMonth;
+    MONTHS_FULL.forEach((name, i) => {
+      const k = y + '-' + pad(i + 1);
+      const v = exp.totals[k] || 0;
+      const li = document.createElement('li');
+      if (!v) li.classList.add('zero');
+      const a = document.createElement('span'); a.textContent = name;
+      const b = document.createElement('span'); b.className = 'r';
+      b.textContent = k > cur ? '—' : usd(v);
+      li.append(a, b);
+      ml.appendChild(li);
     });
   }
 
